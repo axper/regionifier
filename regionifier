@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+# Arguments: list of files to be parsed/edited
+
+# This script will close IntelliJ //region sections with //endregion
+# Openging //region comments must exist
+import re
+import sys
+import os
+
+def insert_line_to_file(filepath, ind, text_to_insert):
+    fr = open(filepath, "r")
+    contents = fr.readlines()
+    fr.close()
+    contents.insert(ind, text_to_insert)
+    fr = open(filepath, "w")
+    contents = "".join(contents)
+    fr.write(contents)
+    fr.close()
+
+
+for path_to_file in sys.argv[1:]:
+    print('PARSING/EDITING FILE: ', path_to_file)
+    if not os.path.isfile(path_to_file):
+        print('Path', path_to_file, 'is not a file, skipping...')
+        continue
+
+    num_lines = sum(1 for line in open(path_to_file))
+    print('File has', num_lines, 'lines')
+
+    with open(path_to_file) as f:
+        file_contents = enumerate(f.readlines())
+
+    current_region_name = ''
+    region_started = False
+    lines_inserted = 0
+
+    for line_number, line in file_contents:
+        print(line_number, line, end='')
+        if '//region' in line:
+
+            if region_started:
+                # Go back and put //endregion
+                region_started = False
+
+                index = line_number - 1 + lines_inserted
+                print('INSERTING //endregion line after line#', index, 'already ins lines#: ', lines_inserted)
+                insert_line_to_file(path_to_file, index, '    //endregion\n')
+                lines_inserted += 1
+
+                region_started = True
+                continue
+
+            region_started = True
+            current_region_name = re.search('region (.*?)$', line).group(1)
+            print('FOUND REGION:', current_region_name)
+
+        elif '//endregion' in line:
+            region_started = False
+
+    if region_started:
+        print('region_started at the end, inserting //endregion before }')
+        for line_number, line in enumerate(reversed(list(open(path_to_file)))):
+            line_number = num_lines - line_number - 1
+            print('reverse:', line_number, line, end='')
+
+            if '    }' in line:
+                # Go back and put //endregion
+                region_started = False
+
+                index = line_number + 1 + lines_inserted
+                print('INSERTING //endregion line after line#', index, 'already ins lines#: ', lines_inserted)
+                insert_line_to_file(path_to_file, index, '    //endregion\n')
+                lines_inserted += 1
+
+                region_started = True
+                break;
+
+
